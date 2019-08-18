@@ -1,0 +1,179 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: welcome
+  namespace: default
+  resourceVersion: '125635'
+  selfLink: /apis/template.openshift.io/v1/namespaces/default/templates/welcome
+  uid: 455449a8-beb0-11e9-9e58-0800270809a1
+objects:
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      annotations:
+        openshift.io/generated-by: OpenShiftNewApp
+      creationTimestamp: null
+      labels:
+        app: welcome
+      name: welcome
+    spec:
+      ports:
+        - name: 8080-tcp
+          port: 8080
+          protocol: TCP
+          targetPort: 8080
+      selector:
+        app: welcome
+        deploymentconfig: welcome
+      sessionAffinity: None
+      type: ClusterIP
+    status:
+      loadBalancer: {}
+# There are my configs maps
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: configs-example
+    data:
+      confing.conf: |-
+        error_log  /var/log/nginx/error.log warn;
+        pid        /tmp/nginx.pid;
+    path: /dev/scipts
+    subPath: /dev/scipts/confing.conf
+        TEST 1
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: script-example
+    data:
+      script.sh: |-
+        #!/bin/bash
+        echo Hello from ConfigMap
+        
+    path: /home/scipts
+
+  - apiVersion: v1
+    kind: Route
+    metadata:
+      annotations:
+        openshift.io/host.generated: 'true'
+      creationTimestamp: null
+      labels:
+        app: welcome
+      name: welcome
+    spec:
+      host: welcome.default.192.168.99.100.nip.io               # Change to your domain
+      port:
+        targetPort: 8080-tcp
+      to:
+        kind: Service
+        name: welcome
+    status:
+      ingress:
+        - conditions:
+              status: 'True'
+              type: Admitted
+          host: welcome.default.192.168.99.100.nip.io           # Change to your domain
+          routerName: router
+  - apiVersion: v1
+    kind: ImageStream
+    metadata:
+      annotations:
+        openshift.io/generated-by: OpenShiftNewApp
+        openshift.io/image.dockerRepositoryCheck: '2016-08-29T22:35:50.000Z'
+      creationTimestamp: null
+      generation: 2
+      labels:
+        app: welcome
+      name: welcome
+    spec:
+      tags:
+        - annotations:
+            openshift.io/imported-from: eformat/welcome
+          from:
+            kind: DockerImage
+            name: 'docker.io/eformat/welcome:latest'
+          generation: 2
+          importPolicy: {}
+          name: latest
+    status:
+      dockerImageRepository: ''
+  - apiVersion: v1
+    kind: DeploymentConfig
+    metadata:
+      annotations:
+        openshift.io/generated-by: OpenShiftNewApp
+      creationTimestamp: null
+      labels:
+        app: welcome
+      name: welcome
+    spec:
+      replicas: 1
+      selector:
+        app: welcome
+        deploymentconfig: welcome
+      strategy:
+        resources: {}
+        rollingParams:
+          intervalSeconds: 1
+          maxSurge: 25%
+          maxUnavailable: 25%
+          timeoutSeconds: 600
+          updatePeriodSeconds: 1
+        type: Rolling
+      template:
+        metadata:
+          annotations:
+            openshift.io/container.welcome.image.entrypoint: '["./hello.sh"]'
+            openshift.io/generated-by: OpenShiftNewApp
+          creationTimestamp: null
+          labels:
+            app: welcome
+            deploymentconfig: welcome
+        spec:
+          containers:
+            - image: 'eformat/welcome:latest'
+              imagePullPolicy: Always
+              name: welcome
+              ports:
+                - containerPort: 8080
+                  protocol: TCP
+              resources: {}
+              terminationMessagePath: /dev/termination-log
+              volumeMounts:                                       # There are mounts and volumes
+              - name: configs-volumes
+                mountPath: /dev/configs                              
+              - name: script-volumes
+                mountPath: /home/scipts
+                subPath: script.sh                               # INVESTIGATE
+                accessModes:                                     # INVESTIGATE IT
+                  - ReadWriteMany
+
+          volumes:
+          - name: configs-volumes
+            configMap:
+              name: configs-example
+          - name: script-volumes
+            configMap:
+              name: script-example
+              accessModes:
+                - ReadWriteMany
+
+
+
+          dnsPolicy: ClusterFirst
+          restartPolicy: Always
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+      test: false
+      triggers:
+        - type: ConfigChange
+        - imageChangeParams:
+            automatic: true
+            containerNames:
+              - welcome
+            from:
+              kind: ImageStreamTag
+              name: 'welcome:latest'
+          type: ImageChange
+    status: {}
